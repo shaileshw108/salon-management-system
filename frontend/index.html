@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shiva's Salon</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <nav><strong>SHIVA'S SALON</strong><a href="#services">Services</a><a href="#gallery">Our Art</a></nav>
+    <div class="hero-copy">
+      <p class="eyebrow">STYLE • CONFIDENCE • YOU</p>
+      <h1>Look sharp.<br />Feel confident.</h1>
+      <p>Skip the wait at the counter. Choose your service, join the queue and keep your token.</p>
+      <a class="button" href="#join">Join the queue</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="services" class="section"><p class="eyebrow">OUR SERVICES</p><h2>Choose your style.</h2><div id="service-list" class="cards"></div></section>
+    <section id="join" class="section panel"><p class="eyebrow">QUEUE</p><h2>Join without an account.</h2>
+      <form id="queue-form">
+        <input id="name" required minlength="2" placeholder="Your name" />
+        <input id="phone" required minlength="7" placeholder="Mobile number" />
+        <select id="service" required></select>
+        <button class="button" type="submit">Get my token</button>
+      </form>
+      <div id="result" class="result" hidden></div>
+    </section>
+    <section id="gallery" class="section"><p class="eyebrow">OUR ART</p><h2>Recent work.</h2><div id="gallery-list" class="gallery"></div></section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
