@@ -1,12 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
-from fastapi import Depends
 
 from .config import get_settings
 from .database import Base, engine, get_db
 from .models import GalleryItem, QueueEntry, QueueStatus, Service
-from .schemas import GalleryCreate, GalleryResponse, QueueJoinRequest, QueueResponse, ServiceCreate, ServiceResponse
+from .schemas import GalleryResponse, QueueJoinRequest, QueueResponse, ServiceResponse
 
 settings = get_settings()
 app = FastAPI(title="Shiva's Salon API", version="0.1.0")
@@ -46,11 +45,3 @@ def queue_status(entry_id: int, db: Session = Depends(get_db)):
 @app.get("/api/gallery", response_model=list[GalleryResponse])
 def gallery(db: Session = Depends(get_db)):
     return list(db.scalars(select(GalleryItem).where(GalleryItem.is_active.is_(True)).order_by(GalleryItem.id.desc())))
-
-@app.post("/api/gallery", response_model=GalleryResponse)
-def create_gallery(payload: GalleryCreate, db: Session = Depends(get_db)):
-    item = GalleryItem(**payload.model_dump())
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return item
