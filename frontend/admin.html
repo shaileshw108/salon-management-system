@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shiva's Salon — Owner Dashboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <section id="login-view" class="auth-card">
+      <p class="eyebrow">SHIVA'S SALON</p>
+      <h1>Owner dashboard</h1>
+      <p class="muted">Secure access to your queue, services and gallery.</p>
+      <form id="login-form" class="stack-form">
+        <input id="username" required placeholder="Username" autocomplete="username" />
+        <input id="password" required type="password" placeholder="Password" autocomplete="current-password" />
+        <button class="button" type="submit">Sign in</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <section id="dashboard-view" hidden>
+      <header class="admin-header">
+        <div><p class="eyebrow">OWNER CONTROL</p><h1>Good day. Let's run the salon.</h1></div>
+        <button id="logout" class="button secondary">Sign out</button>
+      </header>
+      <div class="stats">
+        <article class="stat"><span>WAITING</span><strong id="waiting-count">0</strong></article>
+        <article class="stat"><span>SERVING</span><strong id="serving-token">—</strong></article>
+        <article class="stat"><span>TODAY</span><strong id="today-count">0</strong></article>
+      </div>
+      <section class="admin-grid">
+        <article class="panel">
+          <div class="section-head"><div><p class="eyebrow">LIVE QUEUE</p><h2>Customers</h2></div><button id="next" class="button">Call next</button></div>
+          <div id="queue-list" class="queue-list"></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">SERVING NOW</p><div id="serving-card" class="serving-card"><h2>No customer in the chair</h2><p class="muted">Call the next customer when you're ready.</p></div>
+          <hr />
+          <p class="eyebrow">ADD SERVICE</p>
+          <form id="service-form" class="stack-form compact"><input id="service-name" required placeholder="Service name" /><input id="service-duration" required type="number" min="1" max="480" value="30" placeholder="Minutes" /><input id="service-description" placeholder="Short description" /><button class="button" type="submit">Add service</button></form>
+        </article>
+      </section>
+      <section class="panel"><div class="section-head"><div><p class="eyebrow">GALLERY</p><h2>Our Art</h2></div></div><form id="gallery-form" class="inline-form"><input id="gallery-title" required placeholder="Title" /><input id="gallery-url" required type="url" placeholder="Image URL" /><input id="gallery-description" placeholder="Description" /><button class="button" type="submit">Add image</button></form><div id="gallery-admin" class="gallery"></div></section>
+      <p id="toast" class="toast" hidden></p>
+    </section>
+  </main>
+  <script src="./admin.js"></script>
+</body>
+</html>
