@@ -6,8 +6,8 @@ from .models import QueueStatus
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=200)
 
 
 class TokenResponse(BaseModel):
@@ -18,13 +18,12 @@ class TokenResponse(BaseModel):
 class ServiceCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     duration_minutes: int = Field(default=30, ge=1, le=480)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=1000)
 
 
 class ServiceResponse(ServiceCreate):
     id: int
     is_active: bool
-
     model_config = {"from_attributes": True}
 
 
@@ -45,14 +44,25 @@ class QueueResponse(BaseModel):
     joined_at: datetime
 
 
+class QueueStatusResponse(BaseModel):
+    id: int
+    token_number: int
+    service_name: str
+    status: QueueStatus
+    joined_at: datetime
+
+
 class GalleryCreate(BaseModel):
     title: str = Field(min_length=2, max_length=150)
     image_url: str = Field(min_length=5, max_length=500)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=1000)
 
 
 class GalleryResponse(GalleryCreate):
     id: int
     is_active: bool
-
     model_config = {"from_attributes": True}
+
+
+class QueueActionResponse(QueueResponse):
+    pass
