@@ -29,7 +29,7 @@ def normalize_indian_mobile(phone: str) -> str:
     raise ValueError("Phone number must be a valid Indian mobile number")
 
 
-def send_sms(settings: Settings, phone: str, message: str) -> SmsResult:
+def send_sms(settings: Settings, phone: str, message: str, token_number: int) -> SmsResult:
     provider = settings.sms_provider.strip().lower()
     if provider == "mock":
         logger.info("MOCK SMS to %s: %s", phone, message)
@@ -41,10 +41,12 @@ def send_sms(settings: Settings, phone: str, message: str) -> SmsResult:
         raise RuntimeError("MSG91 SMS is not configured")
 
     mobile = normalize_indian_mobile(phone)
+    # Configure the MSG91 flow with this approved template:
+    # "Shiva's Salon: Your turn is coming soon. Please reach the salon shortly. Token #VAR1."
     payload = {
         "flow_id": settings.msg91_flow_id,
         "sender": settings.msg91_sender_id,
-        "recipients": [{"mobiles": mobile, "VAR1": message}],
+        "recipients": [{"mobiles": mobile, "VAR1": str(token_number)}],
     }
     response = httpx.post(
         "https://control.msg91.com/api/v5/flow",
@@ -86,7 +88,7 @@ def send_near_turn_notifications(db: Session, settings: Settings) -> int:
             f"Please reach the salon shortly. Token #{entry.token_number}."
         )
         try:
-            result = send_sms(settings, entry.phone, message)
+            result = send_sms(settings, entry.phone, message, entry.token_number)
         except Exception as exc:
             logger.error("Unable to send near-turn SMS for queue #%s: %s", entry.id, exc)
             continue
