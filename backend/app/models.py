@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -48,6 +48,20 @@ class QueueEntry(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     service: Mapped[Service] = relationship()
+
+
+class NotificationLog(Base):
+    __tablename__ = "notification_logs"
+    __table_args__ = (UniqueConstraint("queue_entry_id", "notification_type", name="uq_queue_notification_type"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    queue_entry_id: Mapped[int] = mapped_column(ForeignKey("queue_entries.id"), index=True)
+    notification_type: Mapped[str] = mapped_column(String(50))
+    provider: Mapped[str] = mapped_column(String(50))
+    provider_message_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    queue_entry: Mapped[QueueEntry] = relationship()
 
 
 class GalleryItem(Base):
