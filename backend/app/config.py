@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60
 
+    # Notifications
+    sms_provider: str = "mock"
+    sms_near_turn_threshold: int = 2
+    msg91_authkey: str = ""
+    msg91_flow_id: str = ""
+    msg91_sender_id: str = ""
+    msg91_timeout_seconds: float = 10.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
