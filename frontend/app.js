@@ -1,4 +1,4 @@
-const API = 'http://127.0.0.1:8000';
+const API = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
 const serviceList = document.querySelector('#service-list');
 const serviceSelect = document.querySelector('#service');
 const result = document.querySelector('#result');
@@ -41,4 +41,4 @@ document.querySelector('#status-form').addEventListener('submit', async (event) 
 
 function escapeHtml(value) { return String(value).replace(/[&<>'\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[c])); }
 function escapeAttr(value) { return escapeHtml(value); }
-Promise.all([loadServices(), loadGallery()]).catch(() => { serviceList.innerHTML = '<p class="muted">Start the FastAPI server to load live services.</p>'; });
+Promise.all([loadServices(), loadGallery()]).catch(() => { serviceList.innerHTML = '<p class="muted">Unable to load live services. Please refresh the page.'; });
