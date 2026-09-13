@@ -9,6 +9,7 @@ from .config import get_settings
 from .database import Base, engine, get_db
 from .dependencies import get_current_owner
 from .models import GalleryItem, Owner, QueueEntry, QueueStatus, Service
+from .notifications import send_near_turn_notifications
 from .schemas import GalleryCreate, GalleryResponse, LoginRequest, QueueJoinRequest, QueueResponse, QueueStatusResponse, ServiceCreate, ServiceResponse, TokenResponse
 from .security import create_access_token, verify_password
 
@@ -24,6 +25,10 @@ def startup() -> None:
 
 def queue_response(entry: QueueEntry) -> QueueResponse:
     return QueueResponse(id=entry.id, token_number=entry.token_number, customer_name=entry.customer_name, phone=entry.phone, service_id=entry.service_id, service_name=entry.service.name, status=entry.status, joined_at=entry.joined_at)
+
+
+def notify_near_turn(db: Session) -> None:
+    send_near_turn_notifications(db, settings)
 
 
 @app.get("/health")
@@ -58,6 +63,7 @@ def join_queue(payload: QueueJoinRequest, db: Session = Depends(get_db)):
     db.add(entry)
     db.commit()
     db.refresh(entry)
+    notify_near_turn(db)
     return queue_response(entry)
 
 
@@ -89,6 +95,7 @@ def call_next(_: Owner = Depends(get_current_owner), db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="No waiting customers")
     entry.status = QueueStatus.SERVING
     db.commit(); db.refresh(entry)
+    notify_near_turn(db)
     return queue_response(entry)
 
 
@@ -101,6 +108,7 @@ def complete_queue(entry_id: int, _: Owner = Depends(get_current_owner), db: Ses
         raise HTTPException(status_code=409, detail="Only a serving customer can be completed")
     entry.status = QueueStatus.COMPLETED
     db.commit(); db.refresh(entry)
+    notify_near_turn(db)
     return queue_response(entry)
 
 
@@ -113,6 +121,7 @@ def cancel_queue(entry_id: int, _: Owner = Depends(get_current_owner), db: Sessi
         raise HTTPException(status_code=409, detail="Queue entry is already closed")
     entry.status = QueueStatus.CANCELLED
     db.commit(); db.refresh(entry)
+    notify_near_turn(db)
     return queue_response(entry)
 
 
