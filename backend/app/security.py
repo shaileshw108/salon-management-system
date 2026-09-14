@@ -9,6 +9,7 @@ from .config import get_settings
 
 
 ALGORITHM = "HS256"
+QUEUE_STATUS_TOKEN_EXPIRE_HOURS = 24
 
 
 def hash_password(password: str) -> str:
@@ -42,4 +43,31 @@ def decode_access_token(token: str) -> str | None:
         subject = payload.get("sub")
         return str(subject) if subject else None
     except jwt.PyJWTError:
+        return None
+
+
+def create_queue_status_token(entry_id: int) -> str:
+    settings = get_settings()
+    now = int(time.time())
+    payload = {
+        "sub": f"queue:{entry_id}",
+        "typ": "queue_status",
+        "iat": now,
+        "exp": now + QUEUE_STATUS_TOKEN_EXPIRE_HOURS * 60 * 60,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+
+
+def decode_queue_status_token(token: str) -> int | None:
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        if payload.get("typ") != "queue_status":
+            return None
+        subject = str(payload.get("sub", ""))
+        if not subject.startswith("queue:"):
+            return None
+        entry_id = int(subject.split(":", 1)[1])
+        return entry_id if entry_id > 0 else None
+    except (jwt.PyJWTError, ValueError, TypeError):
         return None
