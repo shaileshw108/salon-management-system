@@ -1,4 +1,5 @@
 const API = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+const STATUS_TOKEN_KEY = 'salon_queue_status_token';
 const serviceList = document.querySelector('#service-list');
 const serviceSelect = document.querySelector('#service');
 const result = document.querySelector('#result');
@@ -27,9 +28,9 @@ document.querySelector('#queue-form').addEventListener('submit', async (event) =
   result.innerHTML = response.ok
     ? `<strong>Your token is #${data.token_number}</strong><br>We have added you to the ${escapeHtml(data.service_name)} queue.<br><span class="muted">Your private queue status is saved in this browser for this session.</span>`
     : `<strong>Could not join the queue.</strong><br>${escapeHtml(data.detail || 'Please try again.')}`;
-  if (response.ok) {
-    sessionStorage.setItem('salon_queue_status_token', data.status_token);
-    statusInput.value = data.status_token;
+  if (response.ok && data.status_token) {
+    sessionStorage.setItem(STATUS_TOKEN_KEY, data.status_token);
+    statusInput.value = '';
     document.querySelector('#status-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 });
@@ -37,19 +38,26 @@ document.querySelector('#queue-form').addEventListener('submit', async (event) =
 document.querySelector('#status-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const box = document.querySelector('#status-result');
-  const statusToken = statusInput.value.trim();
+  const statusToken = sessionStorage.getItem(STATUS_TOKEN_KEY);
+  if (!statusToken) {
+    box.hidden = false;
+    box.innerHTML = '<strong>No active queue found.</strong><br>Please join the queue again to track your status.';
+    return;
+  }
   try {
-    const response = await fetch(`${API}/api/queue/status/${encodeURIComponent(statusToken)}`);
+    const response = await fetch(`${API}/api/queue/status/${encodeURIComponent(statusToken)}`, { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Queue status not found');
     box.hidden = false;
     box.innerHTML = `<strong>Token #${data.token_number}</strong><br>${escapeHtml(data.service_name)} · <span class="status ${data.status}">${escapeHtml(data.status)}</span><br><span class="muted">Your private status token expires after 24 hours.</span>`;
-  } catch (error) { box.hidden = false; box.innerHTML = `<strong>Unable to check status.</strong><br>${escapeHtml(error.message)}`; }
+  } catch (error) {
+    box.hidden = false;
+    box.innerHTML = `<strong>Unable to check status.</strong><br>${escapeHtml(error.message)}`;
+  }
 });
 
 function escapeHtml(value) { return String(value).replace(/[&<>'\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[c])); }
 function escapeAttr(value) { return escapeHtml(value); }
 
-const savedStatusToken = sessionStorage.getItem('salon_queue_status_token');
-if (savedStatusToken) statusInput.value = savedStatusToken;
+statusInput.value = '';
 Promise.all([loadServices(), loadGallery()]).catch(() => { serviceList.innerHTML = '<p class="muted">Unable to load live services. Please refresh the page.</p>'; });
