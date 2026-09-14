@@ -23,22 +23,28 @@ document.querySelector('#queue-form').addEventListener('submit', async (event) =
   const response = await fetch(`${API}/api/queue/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer_name: document.querySelector('#name').value, phone: document.querySelector('#phone').value, service_id: Number(serviceSelect.value) }) });
   const data = await response.json();
   result.hidden = false;
-  result.innerHTML = response.ok ? `<strong>Your token is #${data.token_number}</strong><br>Queue ID: <strong>${data.id}</strong><br>We have added you to the ${escapeHtml(data.service_name)} queue. Save your Queue ID to track your status.` : `<strong>Could not join the queue.</strong><br>${escapeHtml(data.detail || 'Please try again.')}`;
+  result.innerHTML = response.ok
+    ? `<strong>Your token is #${data.token_number}</strong><br>We have added you to the ${escapeHtml(data.service_name)} queue.<br><span class="muted">Use the same browser to check your status below.</span>`
+    : `<strong>Could not join the queue.</strong><br>${escapeHtml(data.detail || 'Please try again.')}`;
+  if (response.ok) {
+    document.querySelector('#entry-id').value = data.status_token;
+    document.querySelector('#status-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 });
 
 document.querySelector('#status-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const box = document.querySelector('#status-result');
-  const id = Number(document.querySelector('#entry-id').value);
+  const statusToken = document.querySelector('#entry-id').value.trim();
   try {
-    const response = await fetch(`${API}/api/queue/${id}`);
+    const response = await fetch(`${API}/api/queue/status/${encodeURIComponent(statusToken)}`);
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || 'Queue entry not found');
+    if (!response.ok) throw new Error(data.detail || 'Queue status not found');
     box.hidden = false;
-    box.innerHTML = `<strong>Token #${data.token_number}</strong><br>${escapeHtml(data.service_name)} · <span class="status ${data.status}">${escapeHtml(data.status)}</span><br><span class="muted">Your status updates as the owner manages the queue.</span>`;
+    box.innerHTML = `<strong>Token #${data.token_number}</strong><br>${escapeHtml(data.service_name)} · <span class="status ${data.status}">${escapeHtml(data.status)}</span><br><span class="muted">Your private status link expires after 24 hours.</span>`;
   } catch (error) { box.hidden = false; box.innerHTML = `<strong>Unable to check status.</strong><br>${escapeHtml(error.message)}`; }
 });
 
 function escapeHtml(value) { return String(value).replace(/[&<>'\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[c])); }
 function escapeAttr(value) { return escapeHtml(value); }
-Promise.all([loadServices(), loadGallery()]).catch(() => { serviceList.innerHTML = '<p class="muted">Unable to load live services. Please refresh the page.'; });
+Promise.all([loadServices(), loadGallery()]).catch(() => { serviceList.innerHTML = '<p class="muted">Unable to load live services. Please refresh the page.</p>'; });
