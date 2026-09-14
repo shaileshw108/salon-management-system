@@ -42,6 +42,7 @@ class QueueResponse(BaseModel):
     service_name: str
     status: QueueStatus
     joined_at: datetime
+    status_token: str
 
 
 class QueueStatusResponse(BaseModel):
