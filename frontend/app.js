@@ -38,18 +38,25 @@ document.querySelector('#queue-form').addEventListener('submit', async (event) =
 document.querySelector('#status-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const box = document.querySelector('#status-result');
-  const statusToken = sessionStorage.getItem(STATUS_TOKEN_KEY);
-  if (!statusToken) {
-    box.hidden = false;
-    box.innerHTML = '<strong>No active queue found.</strong><br>Please join the queue again to track your status.';
-    return;
-  }
+  const enteredValue = statusInput.value.trim();
+  const isManualToken = /^\d+$/.test(enteredValue);
+  const savedStatusToken = sessionStorage.getItem(STATUS_TOKEN_KEY);
+
   try {
-    const response = await fetch(`${API}/api/queue/status/${encodeURIComponent(statusToken)}`, { cache: 'no-store' });
+    let url;
+    if (isManualToken) {
+      url = `${API}/api/queue/status/token/${encodeURIComponent(enteredValue)}`;
+    } else if (savedStatusToken) {
+      url = `${API}/api/queue/status/${encodeURIComponent(savedStatusToken)}`;
+    } else {
+      throw new Error('Enter your queue token number, such as 7 or 8.');
+    }
+
+    const response = await fetch(url, { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Queue status not found');
     box.hidden = false;
-    box.innerHTML = `<strong>Token #${data.token_number}</strong><br>${escapeHtml(data.service_name)} · <span class="status ${data.status}">${escapeHtml(data.status)}</span><br><span class="muted">Your private status token expires after 24 hours.</span>`;
+    box.innerHTML = `<strong>Token #${data.token_number}</strong><br>${escapeHtml(data.service_name)} · <span class="status ${data.status}">${escapeHtml(data.status)}</span><br><span class="muted">Queue status updated successfully.</span>`;
   } catch (error) {
     box.hidden = false;
     box.innerHTML = `<strong>Unable to check status.</strong><br>${escapeHtml(error.message)}`;
