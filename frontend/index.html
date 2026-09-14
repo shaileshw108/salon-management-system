@@ -19,7 +19,7 @@
   <main>
     <section id="services" class="section"><p class="eyebrow">OUR SERVICES</p><h2>Choose your style.</h2><div id="service-list" class="cards"></div></section>
     <section id="join" class="section panel"><p class="eyebrow">QUEUE</p><h2>Join without an account.</h2><form id="queue-form"><input id="name" required minlength="2" maxlength="100" placeholder="Your name" autocomplete="name" /><input id="phone" required minlength="7" maxlength="20" placeholder="Mobile number" autocomplete="tel" /><select id="service" required></select><button class="button" type="submit">Get my token</button></form><div id="result" class="result" hidden></div></section>
-    <section id="status" class="section"><p class="eyebrow">TRACK YOUR TOKEN</p><h2>Check your queue.</h2><form id="status-form"><input id="entry-id" required type="number" min="1" placeholder="Enter your queue ID" /><button class="button" type="submit">Check status</button></form><div id="status-result" class="result" hidden></div></section>
+    <section id="status" class="section"><p class="eyebrow">TRACK YOUR TOKEN</p><h2>Check your queue.</h2><form id="status-form"><input id="entry-id" required type="text" autocomplete="off" placeholder="Paste your private status token" /><button class="button" type="submit">Check status</button></form><div id="status-result" class="result" hidden></div></section>
     <section id="gallery" class="section"><p class="eyebrow">OUR ART</p><h2>Recent work.</h2><div id="gallery-list" class="gallery"></div></section>
   </main>
   <script src="./app.js"></script>
