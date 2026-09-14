@@ -123,6 +123,20 @@ def queue_status(status_token: str, db: Session = Depends(get_db)):
     return QueueStatusResponse(id=entry.id, token_number=entry.token_number, service_name=entry.service.name, status=entry.status, joined_at=entry.joined_at)
 
 
+@app.get("/api/queue/status/token/{token_number}", response_model=QueueStatusResponse)
+def queue_status_by_token(token_number: int, db: Session = Depends(get_db)):
+    if token_number <= 0:
+        raise HTTPException(status_code=404, detail="Invalid queue token")
+    entry = db.scalar(
+        select(QueueEntry)
+        .where(func.date(QueueEntry.joined_at) == date.today(), QueueEntry.token_number == token_number)
+        .order_by(QueueEntry.id.desc())
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Queue token not found for today")
+    return QueueStatusResponse(id=entry.id, token_number=entry.token_number, service_name=entry.service.name, status=entry.status, joined_at=entry.joined_at)
+
+
 @app.get("/api/gallery", response_model=list[GalleryResponse])
 def gallery(db: Session = Depends(get_db)):
     return list(db.scalars(select(GalleryItem).where(GalleryItem.is_active.is_(True)).order_by(GalleryItem.id.desc())))
@@ -178,7 +192,8 @@ def create_service(payload: ServiceCreate, _: Owner = Depends(get_current_owner)
     if db.scalar(select(Service).where(func.lower(Service.name) == payload.name.strip().lower())):
         raise HTTPException(status_code=409, detail="Service already exists")
     service = Service(name=payload.name.strip(), duration_minutes=payload.duration_minutes, description=payload.description)
-    db.add(service); db.commit(); db.refresh(service)
+    db.add(service)
+    db.commit(); db.refresh(service)
     return service
 
 
@@ -187,13 +202,18 @@ def update_service(service_id: int, payload: ServiceCreate, _: Owner = Depends(g
     service = db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
-    service.name, service.duration_minutes, service.description = payload.name.strip(), payload.duration_minutes, payload.description
+    duplicate = db.scalar(select(Service).where(func.lower(Service.name) == payload.name.strip().lower(), Service.id != service_id))
+    if duplicate:
+        raise HTTPException(status_code=409, detail="Service already exists")
+    service.name = payload.name.strip()
+    service.duration_minutes = payload.duration_minutes
+    service.description = payload.description
     db.commit(); db.refresh(service)
     return service
 
 
 @app.delete("/api/admin/services/{service_id}", status_code=204)
-def deactivate_service(service_id: int, _: Owner = Depends(get_current_owner), db: Session = Depends(get_db)):
+def delete_service(service_id: int, _: Owner = Depends(get_current_owner), db: Session = Depends(get_db)):
     service = db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -203,13 +223,14 @@ def deactivate_service(service_id: int, _: Owner = Depends(get_current_owner), d
 
 @app.post("/api/admin/gallery", response_model=GalleryResponse, status_code=201)
 def create_gallery(payload: GalleryCreate, _: Owner = Depends(get_current_owner), db: Session = Depends(get_db)):
-    item = GalleryItem(title=payload.title.strip(), image_url=payload.image_url.strip(), description=payload.description)
-    db.add(item); db.commit(); db.refresh(item)
+    item = GalleryItem(title=payload.title.strip(), image_url=str(payload.image_url), description=payload.description)
+    db.add(item)
+    db.commit(); db.refresh(item)
     return item
 
 
 @app.delete("/api/admin/gallery/{item_id}", status_code=204)
-def deactivate_gallery(item_id: int, _: Owner = Depends(get_current_owner), db: Session = Depends(get_db)):
+def delete_gallery(item_id: int, _: Owner = Depends(get_current_owner), db: Session = Depends(get_db)):
     item = db.get(GalleryItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Gallery item not found")
