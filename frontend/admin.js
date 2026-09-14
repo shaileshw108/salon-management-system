@@ -3,6 +3,21 @@ let token = localStorage.getItem('salon_owner_token');
 const $ = (s) => document.querySelector(s);
 function authHeaders() { return token ? { Authorization: `Bearer ${token}` } : {}; }
 function showToast(message, error = false) { const el = $('#toast'); el.textContent = message; el.hidden = false; el.className = `toast ${error ? 'error' : ''}`; setTimeout(() => { el.hidden = true; }, 2800); }
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+async function request(path, options = {}, retries = 3) {
+  try {
+    const response = await fetch(`${API}${path}`, options);
+    if (retries > 0 && [502, 503, 504].includes(response.status)) {
+      await response.body?.cancel();
+      await sleep([1500, 3500, 7000][3 - retries] || 7000);
+      return request(path, options, retries - 1);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) { await sleep([1500, 3500, 7000][3 - retries] || 7000); return request(path, options, retries - 1); }
+    throw new Error('Unable to reach the server. Please try again.');
+  }
+}
 async function readResponse(response) {
   const type = response.headers.get('content-type') || '';
   if (response.status === 204) return null;
@@ -11,7 +26,7 @@ async function readResponse(response) {
   if (!response.ok) throw new Error(data?.detail || 'Request failed');
   return data;
 }
-async function api(path, options = {}) { const headers = { ...authHeaders(), ...(options.headers || {}) }; if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json'; const response = await fetch(`${API}${path}`, { ...options, headers }); if (response.status === 401) { logout(); throw new Error('Session expired'); } return readResponse(response); }
+async function api(path, options = {}) { const headers = { ...authHeaders(), ...(options.headers || {}) }; if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json'; const response = await request(path, { ...options, headers }); if (response.status === 401) { logout(); throw new Error('Session expired'); } return readResponse(response); }
 function logout() { token = null; localStorage.removeItem('salon_owner_token'); $('#login-view').hidden = false; $('#dashboard-view').hidden = true; }
 function renderQueue(entries) { const waiting = entries.filter(x => x.status === 'waiting'); const serving = entries.find(x => x.status === 'serving'); $('#waiting-count').textContent = waiting.length; $('#serving-token').textContent = serving ? `#${serving.token_number}` : '—'; $('#today-count').textContent = entries.length; $('#queue-list').innerHTML = entries.length ? entries.map(x => `<article class="queue-row"><div><strong>#${x.token_number} · ${escapeHtml(x.customer_name)}</strong><span>${escapeHtml(x.service_name)} · ${escapeHtml(x.phone)}</span></div><div><span class="status ${x.status}">${x.status}</span>${x.status === 'serving' ? `<button class="small-button" onclick="complete(${x.id})">Complete</button>` : `<button class="small-button danger-button" onclick="cancelEntry(${x.id})">Cancel</button>`}</div></article>`).join('') : '<p class="muted">No active customers. Your queue is clear.</p>'; $('#serving-card').innerHTML = serving ? `<p class="eyebrow">NOW SERVING</p><h2>#${serving.token_number} · ${escapeHtml(serving.customer_name)}</h2><p>${escapeHtml(serving.service_name)} · ${escapeHtml(serving.phone)}</p><button class="button" onclick="complete(${serving.id})">Complete service</button>` : '<h2>No customer in the chair</h2><p class="muted">Call the next customer when you\'re ready.</p>'; }
 async function loadDashboard() { try { const [queue, gallery] = await Promise.all([api('/api/admin/queue'), api('/api/gallery')]); renderQueue(queue); renderGallery(gallery); } catch (e) { showToast(e.message, true); } }
@@ -20,7 +35,7 @@ async function complete(id) { try { await api(`/api/admin/queue/${id}/complete`,
 async function cancelEntry(id) { if (!confirm('Cancel this queue entry?')) return; try { await api(`/api/admin/queue/${id}/cancel`, { method: 'POST' }); showToast('Customer cancelled'); loadDashboard(); } catch (e) { showToast(e.message, true); } }
 async function removeGallery(id) { if (!confirm('Remove this gallery image?')) return; try { await api(`/api/admin/gallery/${id}`, { method: 'DELETE' }); showToast('Gallery image removed'); loadDashboard(); } catch (e) { showToast(e.message, true); } }
 window.complete = complete; window.cancelEntry = cancelEntry; window.removeGallery = removeGallery;
-$('#login-form').addEventListener('submit', async (e) => { e.preventDefault(); $('#login-error').hidden = true; try { const response = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('#username').value, password: $('#password').value }) }); const data = await readResponse(response); token = data.access_token; localStorage.setItem('salon_owner_token', token); $('#login-view').hidden = true; $('#dashboard-view').hidden = false; loadDashboard(); } catch (e) { $('#login-error').textContent = e.message; $('#login-error').hidden = false; } });
+$('#login-form').addEventListener('submit', async (e) => { e.preventDefault(); $('#login-error').hidden = true; try { const response = await request(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('#username').value, password: $('#password').value }) }); const data = await readResponse(response); token = data.access_token; localStorage.setItem('salon_owner_token', token); $('#login-view').hidden = true; $('#dashboard-view').hidden = false; loadDashboard(); } catch (e) { $('#login-error').textContent = e.message; $('#login-error').hidden = false; } });
 $('#logout').addEventListener('click', logout);
 $('#next').addEventListener('click', async () => { try { await api('/api/admin/queue/next', { method: 'POST' }); showToast('Next customer is now serving'); loadDashboard(); } catch (e) { showToast(e.message, true); } });
 $('#service-form').addEventListener('submit', async (e) => { e.preventDefault(); try { await api('/api/admin/services', { method: 'POST', body: JSON.stringify({ name: $('#service-name').value, duration_minutes: Number($('#service-duration').value), description: $('#service-description').value || null }) }); e.target.reset(); $('#service-duration').value = 30; showToast('Service added'); loadDashboard(); } catch (e) { showToast(e.message, true); } });
