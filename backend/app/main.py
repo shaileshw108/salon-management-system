@@ -1,6 +1,8 @@
+from collections import defaultdict, deque
 from datetime import date
+from time import monotonic
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -11,11 +13,27 @@ from .dependencies import get_current_owner
 from .models import GalleryItem, Owner, QueueEntry, QueueStatus, Service
 from .notifications import send_near_turn_notifications
 from .schemas import GalleryCreate, GalleryResponse, LoginRequest, QueueJoinRequest, QueueResponse, QueueStatusResponse, ServiceCreate, ServiceResponse, TokenResponse
-from .security import create_access_token, verify_password
+from .security import create_access_token, create_queue_status_token, decode_queue_status_token, verify_password
 
 settings = get_settings()
-app = FastAPI(title="Shiva's Salon API", version="1.0.0", description="Queue and salon management API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="Shiva's Salon API",
+    version="1.0.0",
+    description="Queue and salon management API",
+    docs_url=None if settings.environment == "production" else "/docs",
+    redoc_url=None if settings.environment == "production" else "/redoc",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+LOGIN_WINDOW_SECONDS = 60
+LOGIN_MAX_ATTEMPTS = 5
+_login_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 
 @app.on_event("startup")
@@ -24,11 +42,35 @@ def startup() -> None:
 
 
 def queue_response(entry: QueueEntry) -> QueueResponse:
-    return QueueResponse(id=entry.id, token_number=entry.token_number, customer_name=entry.customer_name, phone=entry.phone, service_id=entry.service_id, service_name=entry.service.name, status=entry.status, joined_at=entry.joined_at)
+    return QueueResponse(
+        id=entry.id,
+        token_number=entry.token_number,
+        customer_name=entry.customer_name,
+        phone=entry.phone,
+        service_id=entry.service_id,
+        service_name=entry.service.name,
+        status=entry.status,
+        joined_at=entry.joined_at,
+        status_token=create_queue_status_token(entry.id),
+    )
 
 
 def notify_near_turn(db: Session) -> None:
     send_near_turn_notifications(db, settings)
+
+
+def check_login_rate_limit(client_key: str) -> None:
+    now = monotonic()
+    attempts = _login_attempts[client_key]
+    while attempts and now - attempts[0] >= LOGIN_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please try again in a minute.")
+    attempts.append(now)
+
+
+def clear_login_rate_limit(client_key: str) -> None:
+    _login_attempts.pop(client_key, None)
 
 
 @app.get("/health")
@@ -37,10 +79,13 @@ def health():
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    client_key = request.client.host if request.client else "unknown"
+    check_login_rate_limit(client_key)
     owner = db.scalar(select(Owner).where(Owner.username == payload.username, Owner.is_active.is_(True)))
     if not owner or not verify_password(payload.password, owner.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    clear_login_rate_limit(client_key)
     return TokenResponse(access_token=create_access_token(owner.username))
 
 
@@ -67,8 +112,11 @@ def join_queue(payload: QueueJoinRequest, db: Session = Depends(get_db)):
     return queue_response(entry)
 
 
-@app.get("/api/queue/{entry_id}", response_model=QueueStatusResponse)
-def queue_status(entry_id: int, db: Session = Depends(get_db)):
+@app.get("/api/queue/status/{status_token}", response_model=QueueStatusResponse)
+def queue_status(status_token: str, db: Session = Depends(get_db)):
+    entry_id = decode_queue_status_token(status_token)
+    if not entry_id:
+        raise HTTPException(status_code=404, detail="Queue status link is invalid or expired")
     entry = db.get(QueueEntry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Queue entry not found")
